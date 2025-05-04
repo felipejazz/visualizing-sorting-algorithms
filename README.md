@@ -22,16 +22,14 @@ This project implements several common sorting algorithms and provides a visual 
 
 ## Building
 
-Use CMake to build the project:
+Use CMake to build and run the project:
 
 ```bash
 
 mkdir build
 cd build
 
-
 cmake ..
-
 
 make
 ./SortingVisualizer 
