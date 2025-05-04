@@ -1,206 +1,163 @@
-// src/Main.cpp
 #include <SFML/Graphics.hpp>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Window/Keyboard.hpp>
+#include <SFML/Window/VideoMode.hpp>
+#include <memory>
 #include <vector>
 #include <string>
 #include <iostream>
-#include <optional> // Necessário para o retorno de std::optional<sf::Event> em SFML 3
-#include <functional>
-#include <iostream>
+#include <numeric>
+#include <random>
 #include <algorithm>
+#include <optional>
 
+#include "Config.hpp"
 #include "Visualizer.hpp"
 #include "SortingAlgorithms.hpp"
 
-enum class AppState { MainMenu, Visualizing };
-
-// Declarações dos manipuladores de eventos
-void handleMenuEvents(
-    sf::RenderWindow& window,
-    const sf::Event& event,
-    AppState& currentState,
-    std::vector<std::string>& selectedAlgorithms,
-    const std::vector<std::string>& availableAlgorithms,
-    const std::vector<sf::RectangleShape>& algoButtons,
-    std::vector<sf::RectangleShape>& mutableAlgoButtons,
-    const sf::RectangleShape& startButton,
-    std::unique_ptr<Visualizer>& viz,
-    const std::vector<std::function<void(Visualizer&)>>& algorithmFunctions
-);
-
-void handleVisualizationEvents(
-    sf::RenderWindow& window,
-    const sf::Event& event,
-    AppState& currentState
-);
-
 int main() {
-    // Janela principal
-    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Sorting Visualizer");
-    window.setFramerateLimit(60);
+    // --- Obter resolução do Desktop ---
+    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
 
-    AppState currentState = AppState::MainMenu;
+    // --- Criar janela ---
+    sf::RenderWindow window(desktop, "Sorting Visualizer");
+    // Para fullscreen:
+    // sf::RenderWindow window(desktop, "Sorting Visualizer", sf::Style::Fullscreen);
 
-    // Nomes e funções dos algoritmos
-    std::vector<std::string> availableAlgorithms = { "Bubble Sort" };
-    std::vector<std::function<void(Visualizer&)>> algorithmFunctions = { bubbleSort };
-    std::vector<std::string> selectedAlgorithms;
+    window.setFramerateLimit(FPS);
 
-    // Carrega fonte
-    sf::Font font;
-    if (!font.openFromFile("resources/LiberationSans-Regular.ttf")) {
-        std::cerr << "Erro: não foi possível carregar a fonte." << std::endl;
-        return EXIT_FAILURE;
+    // --- Nomes dos algoritmos ---
+    std::vector<std::string> names = {
+        "Bubble Sort", 
+        "Insertion Sort", 
+        "Merge Sort",
+        "Quick Sort",
+        "Heap Sort"
+    };
+    size_t n = names.size();
+
+    // --- Computar viewports em grid de 2 colunas ---
+    const int cols = 2;
+    int rows = (n + cols - 1) / cols;  // ceil(n / cols)
+
+    std::vector<sf::FloatRect> viewports;
+    viewports.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        int r = i / cols;           // linha
+        int c = i % cols;           // coluna
+        viewports.emplace_back(
+            sf::FloatRect(
+                { float(c) / cols,   // x offset
+                  float(r) / rows }, // y offset
+                { 1.f / cols,        // largura
+                  1.f / rows }       // altura
+            )
+        );
     }
 
-    // Configura botões de seleção
-    float startY = 100.f, btnH = 50.f, btnW = 200.f, spacing = 20.f;
-    std::vector<sf::RectangleShape> buttons;
-    std::vector<sf::Text> buttonTexts;
-    for (size_t i = 0; i < availableAlgorithms.size(); ++i) {
-        sf::RectangleShape btn({btnW, btnH});
-        btn.setPosition({50.f, startY + i * (btnH + spacing)});
-        btn.setFillColor(sf::Color::Blue);
-        btn.setOutlineColor(sf::Color::Black);
-        btn.setOutlineThickness(1.f);
-        buttons.push_back(btn);
-
-        sf::Text txt(font, availableAlgorithms[i], 20);
-        auto bounds = txt.getLocalBounds();
-        txt.setOrigin({bounds.position.x + bounds.size.x/2.f, bounds.position.y + bounds.size.y/2.f});
-        txt.setPosition({btn.getPosition().x + btnW/2.f, btn.getPosition().y + btnH/2.f});
-        txt.setFillColor(sf::Color::White);
-        buttonTexts.push_back(txt);
-    }
-
-    // Botão Start
-    sf::RectangleShape startButton({btnW, btnH});
-    startButton.setPosition({
-        window.getSize().x/2.f - btnW/2.f,
-        startY + availableAlgorithms.size() * (btnH + spacing) + 50.f
-    }
+    // --- Gerar dados iniciais compartilhados ---
+    std::vector<int> baseData(NUM_ELEMENTS);
+    std::iota(baseData.begin(), baseData.end(), 1);
+    std::shuffle(
+        baseData.begin(), baseData.end(),
+        std::mt19937{ std::random_device{}() }
     );
-    startButton.setFillColor(sf::Color::Green);
-    sf::Text startText(font, "Start", 20);
-    auto sb = startText.getLocalBounds();
-    startText.setOrigin({sb.position.x + sb.size.x/2.f, sb.position.y + sb.size.y/2.f});
-    startText.setPosition({startButton.getPosition().x + btnW/2.f,
-                          startButton.getPosition().y + btnH/2.f});
-    startText.setFillColor(sf::Color::White);
 
-    std::unique_ptr<Visualizer> viz = nullptr;
+    // --- Criar visualizadores ---
+    std::vector<std::unique_ptr<Visualizer>> vizs;
+    vizs.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        vizs.emplace_back(
+            std::make_unique<Visualizer>(window, viewports[i], names[i])
+        );
+        vizs.back()->setData(baseData);
+    }
 
-    // Loop principal
+    // --- Instanciar algoritmos ---
+    std::vector<std::unique_ptr<SortAlgorithm>> algos;
+    algos.emplace_back(std::make_unique<BubbleSort>(*vizs[0]));
+    algos.emplace_back(std::make_unique<InsertionSort>(*vizs[1]));
+    algos.emplace_back(std::make_unique<MergeSort>(*vizs[2]));
+    algos.emplace_back(std::make_unique<QuickSort>(*vizs[3]));
+    algos.emplace_back(std::make_unique<HeapSort>(*vizs[4]));
+
+    bool isPaused   = false;
+    bool needsReset = false;
+    bool anyRunning = true;
+
     while (window.isOpen()) {
-        // Eventos
-        while (std::optional<sf::Event> ev = window.pollEvent()) {
-            const sf::Event& event = *ev;
-            if (event.is<sf::Event::Closed>())
+        // --- Eventos ---
+        while (auto evOpt = window.pollEvent()) {
+            const auto& event = *evOpt;
+            if (event.is<sf::Event::Closed>()) {
                 window.close();
-
-            switch (currentState) {
-                case AppState::MainMenu:
-                    handleMenuEvents(
-                        window, event, currentState,
-                        selectedAlgorithms, availableAlgorithms,
-                        buttons, buttons,
-                        startButton,
-                        viz,
-                        algorithmFunctions
-                    );
-                    break;
-
-                case AppState::Visualizing:
-                    handleVisualizationEvents(window, event, currentState);
-                    break;
+            } else if (event.is<sf::Event::KeyPressed>()) {
+                auto code = event.getIf<sf::Event::KeyPressed>()->code;
+                if (code == sf::Keyboard::Key::Escape) {
+                    window.close();
+                } else if (code == sf::Keyboard::Key::P) {
+                    isPaused = !isPaused;
+                    std::cout << (isPaused ? "Paused\n" : "Resumed\n");
+                } else if (code == sf::Keyboard::Key::R) {
+                    needsReset = true;
+                    isPaused   = false;
+                    std::cout << "Resetting...\n";
+                }
             }
         }
 
-        // Desenho
-        window.clear(sf::Color::White);
-        if (currentState == AppState::MainMenu) {
-            // Título
-            sf::Text title(font, "Select Algorithm", 30);
-            auto tb = title.getLocalBounds();
-            title.setOrigin({tb.position.x + tb.size.x/2.f, tb.position.y + tb.size.y/2.f});
-            title.setPosition({window.getSize().x/2.f, 50.f});
-            title.setFillColor(sf::Color::Black);
-            window.draw(title);
-
-            // Botões
-            for (size_t i = 0; i < buttons.size(); ++i) {
-                window.draw(buttons[i]);
-                window.draw(buttonTexts[i]);
+        // --- Reset logic ---
+        if (needsReset) {
+            std::iota(baseData.begin(), baseData.end(), 1);
+            std::shuffle(baseData.begin(), baseData.end(),
+                         std::mt19937{std::random_device{}()});
+            for (size_t i = 0; i < n; ++i) {
+                vizs[i]->setData(baseData);
+                if (names[i] == "Bubble Sort") {
+                    algos[i] = std::make_unique<BubbleSort>(*vizs[i]);
+                }
+                else if (names[i] == "Insertion Sort") {
+                    algos[i] = std::make_unique<InsertionSort>(*vizs[i]);
+                }
+                else if (names[i] == "Merge Sort") {
+                    algos[i] = std::make_unique<MergeSort>(*vizs[i]);
+                }
+                else if (names[i] == "Quick Sort") {
+                    algos[i] = std::make_unique<QuickSort>(*vizs[i]);
+                }
+                else if (names[i] == "Heap Sort") {
+                    algos[i] = std::make_unique<HeapSort>(*vizs[i]);
+                }
             }
-            window.draw(startButton);
-            window.draw(startText);
+            anyRunning = true;
+            needsReset = false;
+        }
+        
+        window.clear(sf::Color::Black);
 
-        } else if (currentState == AppState::Visualizing && viz) {
-            // Enquanto estiver visualizando, nada no main.
+        // --- Update & Draw ---
+        if (!isPaused && anyRunning) {
+            bool stillRunning = false;
+            for (size_t i = 0; i < n; ++i) {
+                if (algos[i] && algos[i]->step())
+                    stillRunning = true;
+            }
+            anyRunning = stillRunning;
+
+            for (auto &vz : vizs)
+                vz->draw();
+
+            if (anyRunning)
+                sf::sleep(sf::milliseconds(DELAY_MS));
+        } else {
+            for (auto &vz : vizs)
+                vz->draw();
+            if (isPaused)
+                sf::sleep(sf::milliseconds(50));
         }
 
         window.display();
     }
 
     return 0;
-}
-
-void handleMenuEvents(
-    sf::RenderWindow& window,
-    const sf::Event& event,
-    AppState& currentState,
-    std::vector<std::string>& selectedAlgorithms,
-    const std::vector<std::string>& availableAlgorithms,
-    const std::vector<sf::RectangleShape>& algoButtons,
-    std::vector<sf::RectangleShape>& mutableAlgoButtons,
-    const sf::RectangleShape& startButton,
-    std::unique_ptr<Visualizer>& viz,
-    const std::vector<std::function<void(Visualizer&)>>& algorithmFunctions
-) {
-    if (const auto* mb = event.getIf<sf::Event::MouseButtonPressed>()) {
-        if (mb->button == sf::Mouse::Button::Left) {
-            sf::Vector2f mp = window.mapPixelToCoords(mb->position);
-            // seleção dos algoritmos
-            for (size_t i = 0; i < algoButtons.size(); ++i) {
-                if (algoButtons[i].getGlobalBounds().contains(mp)) {
-                    const auto& name = availableAlgorithms[i];
-                    auto it = std::find(selectedAlgorithms.begin(), selectedAlgorithms.end(), name);
-                    if (it != selectedAlgorithms.end()) {
-                        selectedAlgorithms.erase(it);
-                        mutableAlgoButtons[i].setFillColor(sf::Color::Blue);
-                    } else {
-                        selectedAlgorithms.push_back(name);
-                        mutableAlgoButtons[i].setFillColor(sf::Color::Red);
-                    }
-                }
-            }
-            // start
-            if (startButton.getGlobalBounds().contains(mp) && !selectedAlgorithms.empty()) {
-                size_t idx = std::distance(
-                    availableAlgorithms.begin(),
-                    std::find(availableAlgorithms.begin(), availableAlgorithms.end(), selectedAlgorithms[0])
-                );
-                viz = std::make_unique<Visualizer>();
-                viz->run(algorithmFunctions[idx]);
-                viz.reset();
-                selectedAlgorithms.clear();
-                currentState = AppState::MainMenu;
-            }
-        }
-    } else if (const auto* kp = event.getIf<sf::Event::KeyPressed>()) {
-        if (kp->code == sf::Keyboard::Key::Escape) {
-            window.close();
-        }
-    }
-}
-
-void handleVisualizationEvents(
-    sf::RenderWindow& window,
-    const sf::Event& event,
-    AppState& currentState
-) {
-    if (const auto* kp = event.getIf<sf::Event::KeyPressed>()) {
-        if (kp->code == sf::Keyboard::Key::Escape) {
-            currentState = AppState::MainMenu;
-        }
-    }
 }

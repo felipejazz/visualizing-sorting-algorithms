@@ -1,172 +1,118 @@
-#include <SFML/Graphics.hpp>
 #include "Visualizer.hpp"
-#include "Config.hpp"
-
-#include <stdexcept>
-#include <thread>
-#include <chrono>
-#include <random>
 #include <algorithm>
+#include <random>
 #include <iostream>
-#include <map>
-#include <optional>
 
-Visualizer::Visualizer()
-  : m_window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Sorting Visualizer"),
-    m_barWidth(0.f),
-    m_isRunning(true),
-    m_maxHeightScale(0.f)
+Visualizer::Visualizer(sf::RenderWindow& window,
+    const sf::FloatRect& viewport,
+    const std::string& name)
+: m_window(window)
+, m_view(sf::FloatRect({0.f, 0.f}, {float(WINDOW_WIDTH), float(WINDOW_HEIGHT)}))
+, m_name(name)
 {
-    m_window.setFramerateLimit(60);
+    m_window.setFramerateLimit(FPS);
+
+    // Use loadFromFile, not openFromFile
+    if (!m_font.openFromFile("resources/LiberationSans-Regular.ttf")) {
+        std::cerr << "Warning: could not load font\n";
+    }
+
+    // Set the viewport (column) for this Visualizer
+    m_view.setViewport(viewport);
+
     initializeData();
-    setupBars();
+
+    m_barWidth       = float(WINDOW_WIDTH)  / NUM_ELEMENTS;
+    m_maxHeightScale = float(WINDOW_HEIGHT) / NUM_ELEMENTS;
+    m_bars.resize(NUM_ELEMENTS);
+    m_colors.assign(NUM_ELEMENTS, sf::Color::White);
+    updateBars();
 }
 
 void Visualizer::initializeData() {
     m_data.resize(NUM_ELEMENTS);
-    m_barColors.assign(NUM_ELEMENTS, sf::Color::White);
-    for (int i = 0; i < NUM_ELEMENTS; ++i)
-        m_data[i] = i + 1;
-
-    std::shuffle(m_data.begin(), m_data.end(), std::mt19937{std::random_device{}()});
+    for (int k = 0; k < NUM_ELEMENTS; ++k)
+        m_data[k] = k + 1;
+    std::shuffle(m_data.begin(), m_data.end(),
+                 std::mt19937{std::random_device{}()});
 }
 
-void Visualizer::setupBars() {
-    m_bars.resize(NUM_ELEMENTS);
-    m_barWidth = static_cast<float>(WINDOW_WIDTH) / NUM_ELEMENTS;
-    m_maxHeightScale = static_cast<float>(WINDOW_HEIGHT) / *std::max_element(m_data.begin(), m_data.end());
-    updateBarsFromData();
+
+void Visualizer::setValue(int idx, int value) {
+    if (idx >= 0 && idx < int(m_data.size())) {
+        m_data[idx] = value;
+        // Opcional: Resetar a cor ao definir valor?
+        // Merge sort controlará as cores, então provavelmente não é necessário.
+        // m_colors[idx] = sf::Color::White;
+    }
+    // A chamada m_viz.draw() no step() do algoritmo cuidará de chamar updateBars()
 }
 
-void Visualizer::updateBarsFromData() {
-    if (m_data.empty()) return;
-    for (int i = 0; i < NUM_ELEMENTS; ++i) {
-        float h = m_data[i] * m_maxHeightScale;
-        m_bars[i].setSize({m_barWidth - 1, h});
-        m_bars[i].setPosition({i * m_barWidth, WINDOW_HEIGHT - h});
-        m_bars[i].setFillColor(m_barColors[i]);
-        m_bars[i].setOutlineThickness(1);
-        m_bars[i].setOutlineColor(sf::Color(50,50,50));
+size_t Visualizer::getSize() const { return m_data.size(); }
+bool   Visualizer::isRunning() const { return m_window.isOpen(); }
+int    Visualizer::getValue(int idx) const { return m_data.at(idx); }
+
+void Visualizer::swapData(int i1, int i2) {
+    std::swap(m_data[i1], m_data[i2]);
+    std::swap(m_colors[i1], m_colors[i2]);
+}
+
+void Visualizer::setHighlight(int idx, const sf::Color& color) {
+    if (idx >= 0 && idx < int(NUM_ELEMENTS))
+        m_colors[idx] = color;
+}
+
+void Visualizer::updateBars() {
+    for (int k = 0; k < NUM_ELEMENTS; ++k) {
+        float h = m_data[k] * m_maxHeightScale;
+        m_bars[k].setSize({m_barWidth, h});
+        m_bars[k].setPosition({k * m_barWidth, WINDOW_HEIGHT - h});
+        m_bars[k].setFillColor(m_colors[k]);
+        m_bars[k].setOutlineThickness(1);
+        m_bars[k].setOutlineColor(sf::Color(50, 50, 50));
     }
 }
 
-void Visualizer::drawState() {
-    drawState(std::vector<std::pair<int, sf::Color>>{});
-}
 
-void Visualizer::handleEvents() {
-    while (std::optional<sf::Event> ev = m_window.pollEvent()) {
-        const sf::Event& event = *ev;
-        if (event.is<sf::Event::Closed>()) {
-            m_window.close();
-            m_isRunning = false;
-        }
-        if (const auto* kp = event.getIf<sf::Event::KeyPressed>()) {
-            if (kp->code == sf::Keyboard::Key::Escape) {
-                m_window.close();
-                m_isRunning = false;
-            }
-        }
-    }
-}
 
-void Visualizer::setBarColor(int idx, sf::Color c) {
-    if (idx>=0 && idx<NUM_ELEMENTS) {
-        m_barColors[idx] = c;
-        m_bars[idx].setFillColor(c);
-    }
-}
+void Visualizer::draw(const std::vector<std::pair<int, sf::Color>>& highlights) {
+    // 1) switch to this view and draw title
+    m_window.setView(m_view);
+    sf::Text title(m_font, m_name, 24);
+    sf::Vector2f viewSize = m_view.getSize();
+    sf::FloatRect textBounds = title.getLocalBounds(); // Use getLocalBounds
 
-void Visualizer::drawState(const std::vector<std::pair<int, sf::Color>>& highlights) {
-    if (!m_window.isOpen() || !m_isRunning) return;
-    handleEvents();
-    if (!m_isRunning) return;
+    // --- CORREÇÃO AQUI ---
+    // Calcula X centralizado usando left e width de localBounds
+    float centeredX = (viewSize.x / 2.f) - (textBounds.position.x + textBounds.size.x / 2.f);
+    float topY = 10.f;
+    // Define a posição usando a sobrecarga (float, float), NÃO o inicializador {}
+    title.setPosition({centeredX, topY});
+    // --- FIM DA CORREÇÃO ---
 
-    m_window.clear(sf::Color::Black);
-    updateBarsFromData();
+    m_window.draw(title);
 
-    std::map<int,sf::Color> orig;
+    // 2) layout bars once from persistent state
+    updateBars();
+
+
     for (auto& hl : highlights) {
-        int i = hl.first;
-        if (i>=0 && i<NUM_ELEMENTS) {
-            orig[i] = m_bars[i].getFillColor();
-            m_bars[i].setFillColor(hl.second);
+        int idx = hl.first;
+        if (idx >= 0 && idx < int(m_bars.size())) {
+            m_bars[idx].setFillColor(hl.second); // Isso sobrepõe a cor persistente
         }
     }
+   
 
+    // 4) draw all bars (com suas cores persistentes definidas por setHighlight)
     for (auto& bar : m_bars)
         m_window.draw(bar);
-
-    m_window.display();
-    if (DELAY_MS>0)
-        std::this_thread::sleep_for(std::chrono::milliseconds(DELAY_MS));
 }
 
-size_t Visualizer::getSize() const {
-    return m_data.size();
-}
-
-int Visualizer::getValue(int idx) const {
-    if (idx<0 || idx>=m_data.size())
-        throw std::out_of_range("getValue index");
-    return m_data[idx];
-}
-
-CompareResult Visualizer::compareIndexes(int i1, int i2, bool show) {
-    if (!m_isRunning) return CompareResult::EQUAL;
-    if (i1<0||i1>=m_data.size()||i2<0||i2>=m_data.size())
-        throw std::out_of_range("compareIndexes");
-    if (show) drawState({{i1,sf::Color::Blue},{i2,sf::Color::Cyan}});
-    int v1=m_data[i1], v2=m_data[i2];
-    if (v1<v2) return CompareResult::LESS;
-    if (v1>v2) return CompareResult::GREATER;
-    return CompareResult::EQUAL;
-}
-
-void Visualizer::swapIndexes(int i1, int i2) {
-    if (!m_isRunning || i1==i2) return;
-    if (i1<0||i1>=m_data.size()||i2<0||i2>=m_data.size())
-        throw std::out_of_range("swapIndexes");
-    std::swap(m_data[i1], m_data[i2]);
-    std::swap(m_barColors[i1], m_barColors[i2]);
-    drawState({{i1, sf::Color::Red},{i2, sf::Color::Red}});
-}
-
-void Visualizer::setValueAtIndex(int idx, int value) {
-    if (!m_isRunning) return;
-    if (idx<0||idx>=m_data.size()) throw std::out_of_range("setValueAtIndex");
-    m_data[idx] = value;
-    drawState({{idx, sf::Color::Yellow}});
-}
-
-void Visualizer::markAsSorted(int idx) {
-    if (!m_isRunning) return;
-    setBarColor(idx, sf::Color::Green);
-    drawState({{idx, sf::Color::Green}});
-}
-
-bool Visualizer::isRunning() const {
-    return m_isRunning && m_window.isOpen();
-}
-
-void Visualizer::run(const std::function<void(Visualizer&)>& sortAlgorithm) {
-    drawState();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    try {
-        sortAlgorithm(*this);
-    } catch (std::exception& e) {
-        std::cerr<<"Error during sort: "<<e.what()<<"\n";
-    }
-    // marca tudo verde ao final
-    if (isRunning()) {
-        for (int i=0;i<NUM_ELEMENTS;++i)
-            setBarColor(i, sf::Color::Green);
-        drawState();
-        std::cout<<"Sorting complete\n";
-    }
-    // mantém janela aberta até ESC ou fechar
-    while (m_window.isOpen()) {
-        handleEvents();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
+// In Visualizer.cpp
+void Visualizer::setData(const std::vector<int>& data) {
+    m_data = data;
+    // reset *persistent* colors (sorted, swapped, etc.)
+    m_colors.assign(m_data.size(), sf::Color::White);
+    updateBars();  
 }

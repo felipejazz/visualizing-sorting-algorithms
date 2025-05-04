@@ -1,50 +1,44 @@
-#ifndef SORTING_ALGORITHMS_VISUALIZER_HPP
-#define SORTING_ALGORITHMS_VISUALIZER_HPP
-
+#pragma once
 #include <SFML/Graphics.hpp>
 #include <vector>
-#include <functional>
-#include <utility>
-
+#include <string>
+#include <map>
 #include "Config.hpp"
-
-enum class CompareResult { LESS = -1, EQUAL = 0, GREATER = 1 };
 
 class Visualizer {
 public:
-    Visualizer();
+    // window: janela compartilhada
+    // viewport: fração [0..1] x [0..1] indicando coluna
+    // name: nome do algoritmo
+    Visualizer(sf::RenderWindow& window,
+               const sf::FloatRect& viewport,
+               const std::string& name);
 
     size_t getSize() const;
-    int    getValue(int index) const;
+    bool   isRunning() const;
+    int    getValue(int idx) const;
+    void setData(const std::vector<int>& data);
+    void setValue(int idx, int value); // <<< ADICIONE ESTA LINHA
+    // troca só nos dados e cores
+    void swapData(int i1, int i2);
+    // permite destacar uma célula (não altera dado)
+    void setHighlight(int idx, const sf::Color& color);
 
-    CompareResult compareIndexes(int i1, int i2, bool show = true);
-
-    void swapIndexes(int i1, int i2);
-    void setValueAtIndex(int idx, int value);
-    void markAsSorted(int idx);
-
-    bool isRunning() const;
-
-    // Remove the “={}” default here and supply an overload instead
-    void drawState(const std::vector<std::pair<int, sf::Color>>& highlights);
-    void drawState();  
-
-    void run(const std::function<void(Visualizer&)>& sortAlgorithm);
-
-private:
+    // desenha BARRAS + nome no topo
+    // highlights: pares (idx,cor)
+    void draw(const std::vector<std::pair<int, sf::Color>>& highlights = {});
     void initializeData();
-    void setupBars();
-    void handleEvents();
-    void updateBarsFromData();
-    void setBarColor(int index, sf::Color color);
-
-    sf::RenderWindow            m_window;
-    std::vector<int>            m_data;
+private:
+    sf::RenderWindow&        m_window;
+    sf::View                 m_view;
+    std::string              m_name;
+    sf::Font                 m_font;
+    std::vector<int>         m_data;
     std::vector<sf::RectangleShape> m_bars;
-    std::vector<sf::Color>      m_barColors;
-    float                       m_barWidth    = 0.f;
-    bool                        m_isRunning   = true;
-    float                       m_maxHeightScale = 0.f;
-};
+    std::vector<sf::Color>   m_colors;
+    float                    m_barWidth;
+    float                    m_maxHeightScale;
 
-#endif // SORTING_ALGORITHMS_VISUALIZER_HPP
+    
+    void updateBars();
+};
