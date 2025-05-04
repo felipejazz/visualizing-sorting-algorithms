@@ -25,20 +25,15 @@ This project implements several common sorting algorithms and provides a visual 
 Use CMake to build the project:
 
 ```bash
-# 1. Clone the repository (if applicable)
-# git clone <your-repo-url>
-# cd sorting-algorithms
 
-# 2. Create a build directory
 mkdir build
 cd build
 
-# 3. Configure the project with CMake
-#    Make sure SFML (and GoogleTest, if needed) are installed and findable by CMake
-#    You might need to specify SFML_DIR, e.g., cmake .. -DSFML_DIR=/path/to/sfml/lib/cmake/SFML
+
 cmake ..
 
-# 4. Build the project
+
 make
-# Or use your specific build tool (e.g., ninja, Visual Studio, Xcode) s
+./SortingVisualizer 
+
 ``` 
