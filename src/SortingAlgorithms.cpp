@@ -1,132 +1,115 @@
 #include "SortingAlgorithms.hpp"
 #include <SFML/Graphics.hpp>
 #include <vector>
-#include <algorithm> // Para std::min
-#include <iostream>  // Para debug (opcional)
+#include <algorithm>
+#include <iostream>
 
-
-// === BubbleSort ===
 BubbleSort::BubbleSort(Visualizer& viz)
-  : SortAlgorithm(viz), i(0), j(0), swapped(false) // Chama construtor base
+  : SortAlgorithm(viz), i(0), j(0), swapped(false)
 {}
 
-// --- Implementação COMPLETA do step() do BubbleSort ---
 bool BubbleSort::step() {
     auto n = m_viz.getSize();
     if (i >= n-1) {
-        // Garante que o último elemento também seja marcado como verde ao final
         if (n > 0) m_viz.setHighlight(0, sf::Color::Green);
-        return false; // Terminou
+        return false;
     }
 
-    // Comparação dentro da passagem atual
     if (j < n - 1 - i) {
         bool greater = m_viz.getValue(j) > m_viz.getValue(j + 1);
-        // Não chama draw aqui, apenas define highlights persistentes se necessário
-        // Os highlights temporários serão tratados no loop principal
-        // ou poderíamos retornar os highlights desejados.
-        // Por simplicidade agora, não fazemos highlights temporários aqui.
 
         if (greater) {
             m_viz.swapData(j, j + 1);
             swapped = true;
-            // Destaca a troca (persistente até a próxima atualização)
+
             m_viz.setHighlight(j, sf::Color::Red);
             m_viz.setHighlight(j+1, sf::Color::Red);
         } else {
-            // Limpa highlights de trocas anteriores (se houver)
+
              m_viz.setHighlight(j, sf::Color::White);
-             // j+1 será verificado/limpo na próxima iteração de j ou no fim da passagem
-             if (j+1 == n - 1 - i) { // Se j+1 é o último da passagem atual
-                m_viz.setHighlight(j+1, sf::Color::Green); // Marca como ordenado
+
+             if (j+1 == n - 1 - i) {
+                m_viz.setHighlight(j+1, sf::Color::Green);
              } else {
                  m_viz.setHighlight(j+1, sf::Color::White);
              }
         }
         ++j;
-    } else { // Fim de uma passagem (j atingiu n-1-i)
-        // Marca o último elemento da passagem como 'ordenado' (verde)
+    } else {
+
         m_viz.setHighlight(n - 1 - i, sf::Color::Green);
 
-        // Se não houve trocas nesta passagem, o array está ordenado
         if (!swapped) {
-            // Marca todos os elementos restantes (que ainda não são verdes) como verdes
             for (size_t k = 0; k < n - 1 - i; ++k) {
                  m_viz.setHighlight(k, sf::Color::Green);
             }
-            return false; // Terminou
+            return false;
         }
 
-        // Prepara para a próxima passagem
         swapped = false;
         j = 0;
         ++i;
-         // Limpa highlight do primeiro elemento da nova passagem
          if (i < n - 1) {
              m_viz.setHighlight(0, sf::Color::White);
          }
     }
-    // Não chama m_viz.draw() aqui. Loop principal fará isso.
-    return true; // Continua rodando
+
+    return true;
 }
 
 
-// === InsertionSort ===
+
+
 InsertionSort::InsertionSort(Visualizer& viz)
-  : SortAlgorithm(viz), i(1), j(1), phase(Start) // Chama construtor base
+  : SortAlgorithm(viz), i(1), j(1), phase(Start)
 {}
 
-// --- Implementação COMPLETA do step() do InsertionSort ---
 bool InsertionSort::step() {
     auto n = m_viz.getSize();
-    if (i >= n) return false; // Terminou
+    if (i >= n) return false;
 
     switch(phase) {
         case Start:
             j = i;
-            // Marca o elemento 'i' que está sendo inserido
+
             m_viz.setHighlight(i, sf::Color::Yellow);
             phase = Shifting;
-            // Cai para Shifting se j>0
-            break; // Sai do switch por agora, próximo step fará o shift
+
+            break;
 
         case Shifting:
-            // Compara j com j-1 e troca se necessário
+
             if (j > 0 && m_viz.getValue(j - 1) > m_viz.getValue(j)) {
-                 // Destaca os elementos sendo comparados/trocados
+
                  m_viz.setHighlight(j - 1, sf::Color::Red);
-                 m_viz.setHighlight(j, sf::Color::Red); // Elemento amarelo sendo movido
+                 m_viz.setHighlight(j, sf::Color::Red);
                  m_viz.swapData(j - 1, j);
-                 m_viz.setHighlight(j - 1, sf::Color::White); // Limpa highlight do anterior
-                 m_viz.setHighlight(j, sf::Color::Yellow); // Mantém o movido amarelo
+                 m_viz.setHighlight(j - 1, sf::Color::White);
+                 m_viz.setHighlight(j, sf::Color::Yellow);
                 --j;
-                 // Se j chegou a 0, ou se o próximo não for maior, vai para MarkSorted
                  if (j == 0 || !(m_viz.getValue(j - 1) > m_viz.getValue(j))) {
                      phase = MarkSorted;
                  }
             } else {
-                 // Elemento 'i' (agora em j) está na posição correta
                 phase = MarkSorted;
             }
-            break; // Sai do switch
+            break;
 
         case MarkSorted:
-            // Marca a parte ordenada [0..i] como verde
             for (size_t k = 0; k <= i; ++k) {
                 m_viz.setHighlight(k, sf::Color::Green);
             }
-            ++i; // Passa para o próximo elemento a ser inserido
-            phase = Start; // Recomeça o ciclo para o novo 'i'
-            break; // Sai do switch
+            ++i;
+            phase = Start;
+            break;
     }
-    // Não chama m_viz.draw() aqui. Loop principal fará isso.
-    return true; // Continua rodando
+    return true;
 }
 
 
 // === MergeSort ===
 MergeSort::MergeSort(Visualizer& viz)
-    : SortAlgorithm(viz), // Chama construtor base
+    : SortAlgorithm(viz),
       m_n(viz.getSize()),
       m_curr_size(0),
       m_left_start(0),
@@ -139,13 +122,8 @@ MergeSort::MergeSort(Visualizer& viz)
       m_phase(Initialize)
 {}
 
-// --- Implementação COMPLETA do step() do MergeSort ---
-// (Como fornecido anteriormente, mas sem a chamada drawHighlights interna)
 bool MergeSort::step() {
     if (m_phase == Done) return false;
-
-    // Variáveis locais para highlights temporários (se necessário passá-los para draw)
-    // std::vector<std::pair<int, sf::Color>> current_highlights;
 
     switch (m_phase) {
         case Initialize:
@@ -154,11 +132,9 @@ bool MergeSort::step() {
             m_phase = Merging;
             if (m_n <= 1) {
                  m_phase = Done;
-                 // Marcar como verde se n=1?
                  if (m_n == 1) m_viz.setHighlight(0, sf::Color::Green);
                  break;
             }
-             // Cai para Merging
 
         case Merging: {
              if (m_k == 0) {
@@ -167,42 +143,39 @@ bool MergeSort::step() {
 
                 if (m_mid >= m_right_end) {
                     m_phase = NextRange;
-                    goto next_phase_check; // Usa goto para evitar warnings de fallthrough e reavaliar
+                    goto next_phase_check;
                 }
 
                 m_i = m_left_start;
                 m_j = m_mid;
                 m_k = 0;
                  m_temp_buffer.assign(m_right_end - m_left_start, 0);
-                 // Limpa highlights anteriores nos ranges atuais (opcional)
                  for(size_t h_idx = m_left_start; h_idx < m_right_end; ++h_idx)
                     m_viz.setHighlight(h_idx, sf::Color::White);
             }
 
-            // Destaca elementos sendo comparados
             if (m_i < m_mid) m_viz.setHighlight(m_i, sf::Color::Blue);
             if (m_j < m_right_end) m_viz.setHighlight(m_j, sf::Color::Cyan);
-
 
             if (m_i < m_mid && m_j < m_right_end) {
                 if (m_viz.getValue(m_i) <= m_viz.getValue(m_j)) {
                     m_temp_buffer[m_k] = m_viz.getValue(m_i);
-                    m_viz.setHighlight(m_i, sf::Color::White); // Limpa highlight após comparação
+                    m_viz.setHighlight(m_i, sf::Color::White);
                     m_i++;
                 } else {
                     m_temp_buffer[m_k] = m_viz.getValue(m_j);
-                     m_viz.setHighlight(m_j, sf::Color::White); // Limpa highlight
+                     m_viz.setHighlight(m_j, sf::Color::White);
                     m_j++;
                 }
             }
             else if (m_i >= m_mid && m_j < m_right_end) {
                 m_temp_buffer[m_k] = m_viz.getValue(m_j);
-                 m_viz.setHighlight(m_j, sf::Color::White); // Limpa highlight
+                 m_viz.setHighlight(m_j, sf::Color::White);
                 m_j++;
             }
             else if (m_j >= m_right_end && m_i < m_mid) {
                  m_temp_buffer[m_k] = m_viz.getValue(m_i);
-                 m_viz.setHighlight(m_i, sf::Color::White); // Limpa highlight
+                 m_viz.setHighlight(m_i, sf::Color::White);
                 m_i++;
             }
              else {
@@ -218,23 +191,20 @@ bool MergeSort::step() {
                  m_k = 0;
              }
 
-            break; // Fim do case Merging
+            break;
         }
 
         case CopyingBack:
             if (m_k < m_temp_buffer.size()) {
                 m_viz.setValue(m_left_start + m_k, m_temp_buffer[m_k]);
-                m_viz.setHighlight(m_left_start + m_k, sf::Color::Red); // Destaca cópia (temporário até prox draw)
+                m_viz.setHighlight(m_left_start + m_k, sf::Color::Red);
                 m_k++;
             } else {
-                 // Limpa highlight vermelho após cópia
                  for(size_t h_idx = m_left_start; h_idx < m_right_end; ++h_idx)
                     m_viz.setHighlight(h_idx, sf::Color::White);
                 m_phase = NextRange;
-                // Cai para NextRange
             }
              if (m_phase == CopyingBack) break;
-
 
         case NextRange:
             m_left_start += 2 * m_curr_size;
@@ -242,7 +212,6 @@ bool MergeSort::step() {
 
             if (m_left_start >= m_n) {
                 m_phase = NextPass;
-                 // Cai para NextPass
             } else {
                  m_phase = Merging;
                  break;
@@ -258,7 +227,7 @@ bool MergeSort::step() {
                  for (size_t k_final=0; k_final < m_n; ++k_final) {
                      m_viz.setHighlight(k_final, sf::Color::Green);
                  }
-                 return false; // Terminou
+                 return false;
             } else {
                 m_phase = Merging;
                 break;
@@ -267,18 +236,15 @@ bool MergeSort::step() {
         case Done:
              return false;
 
-    } // Fim do switch
-
-next_phase_check: // Label para reavaliar após mudança de fase com goto
-    if (m_phase == NextRange || m_phase == NextPass || m_phase == CopyingBack || m_phase == Merging) {
-         // Se mudou para uma fase que precisa continuar no próximo step, retorna true
-         // Ou se for para CopyingBack / Merging e precisa recalcular/iniciar algo
-         return true;
-    } else if (m_phase == Done) {
-         return false; // Se terminou
     }
 
-    // Caso padrão, continua rodando
+next_phase_check:
+    if (m_phase == NextRange || m_phase == NextPass || m_phase == CopyingBack || m_phase == Merging) {
+         return true;
+    } else if (m_phase == Done) {
+         return false;
+    }
+
     return true;
 }
 // === QuickSort ===

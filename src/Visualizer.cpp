@@ -12,12 +12,10 @@ Visualizer::Visualizer(sf::RenderWindow& window,
 {
     m_window.setFramerateLimit(FPS);
 
-    // Use loadFromFile, not openFromFile
     if (!m_font.openFromFile("resources/LiberationSans-Regular.ttf")) {
         std::cerr << "Warning: could not load font\n";
     }
 
-    // Set the viewport (column) for this Visualizer
     m_view.setViewport(viewport);
 
     initializeData();
@@ -41,11 +39,8 @@ void Visualizer::initializeData() {
 void Visualizer::setValue(int idx, int value) {
     if (idx >= 0 && idx < int(m_data.size())) {
         m_data[idx] = value;
-        // Opcional: Resetar a cor ao definir valor?
-        // Merge sort controlará as cores, então provavelmente não é necessário.
-        // m_colors[idx] = sf::Color::White;
     }
-    // A chamada m_viz.draw() no step() do algoritmo cuidará de chamar updateBars()
+
 }
 
 size_t Visualizer::getSize() const { return m_data.size(); }
@@ -76,43 +71,40 @@ void Visualizer::updateBars() {
 
 
 void Visualizer::draw(const std::vector<std::pair<int, sf::Color>>& highlights) {
-    // 1) switch to this view and draw title
     m_window.setView(m_view);
     sf::Text title(m_font, m_name, 24);
     sf::Vector2f viewSize = m_view.getSize();
-    sf::FloatRect textBounds = title.getLocalBounds(); // Use getLocalBounds
+    sf::FloatRect textBounds = title.getLocalBounds();
 
-    // --- CORREÇÃO AQUI ---
-    // Calcula X centralizado usando left e width de localBounds
+
     float centeredX = (viewSize.x / 2.f) - (textBounds.position.x + textBounds.size.x / 2.f);
     float topY = 10.f;
-    // Define a posição usando a sobrecarga (float, float), NÃO o inicializador {}
+
     title.setPosition({centeredX, topY});
-    // --- FIM DA CORREÇÃO ---
+
 
     m_window.draw(title);
 
-    // 2) layout bars once from persistent state
     updateBars();
 
 
     for (auto& hl : highlights) {
         int idx = hl.first;
         if (idx >= 0 && idx < int(m_bars.size())) {
-            m_bars[idx].setFillColor(hl.second); // Isso sobrepõe a cor persistente
+            m_bars[idx].setFillColor(hl.second);
         }
     }
    
 
-    // 4) draw all bars (com suas cores persistentes definidas por setHighlight)
+
     for (auto& bar : m_bars)
         m_window.draw(bar);
 }
 
-// In Visualizer.cpp
+
 void Visualizer::setData(const std::vector<int>& data) {
     m_data = data;
-    // reset *persistent* colors (sorted, swapped, etc.)
+    
     m_colors.assign(m_data.size(), sf::Color::White);
     updateBars();  
 }

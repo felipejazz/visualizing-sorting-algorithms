@@ -10,7 +10,7 @@ target_include_directories(visualizer_lib PUBLIC
 )
 
 target_link_libraries(visualizer_lib PUBLIC
-    sfml-graphics
-    sfml-window
-    sfml-system
+    SFML::Graphics
+    SFML::Window
+    SFML::System
 )

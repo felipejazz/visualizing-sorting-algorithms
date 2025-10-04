@@ -7,9 +7,7 @@
 
 class Visualizer {
 public:
-    // window: janela compartilhada
-    // viewport: fração [0..1] x [0..1] indicando coluna
-    // name: nome do algoritmo
+
     Visualizer(sf::RenderWindow& window,
                const sf::FloatRect& viewport,
                const std::string& name);
@@ -18,14 +16,13 @@ public:
     bool   isRunning() const;
     int    getValue(int idx) const;
     void setData(const std::vector<int>& data);
-    void setValue(int idx, int value); // <<< ADICIONE ESTA LINHA
-    // troca só nos dados e cores
+    void setValue(int idx, int value);
+
     void swapData(int i1, int i2);
-    // permite destacar uma célula (não altera dado)
+
     void setHighlight(int idx, const sf::Color& color);
 
-    // desenha BARRAS + nome no topo
-    // highlights: pares (idx,cor)
+
     void draw(const std::vector<std::pair<int, sf::Color>>& highlights = {});
     void initializeData();
 private:

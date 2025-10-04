@@ -16,17 +16,13 @@
 #include "SortingAlgorithms.hpp"
 
 int main() {
-    // --- Obter resolução do Desktop ---
+    
     sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
 
-    // --- Criar janela ---
-    sf::RenderWindow window(desktop, "Sorting Visualizer");
-    // Para fullscreen:
-    // sf::RenderWindow window(desktop, "Sorting Visualizer", sf::Style::Fullscreen);
+    sf::RenderWindow window(desktop, "Sorting Visualizer");    
 
     window.setFramerateLimit(FPS);
 
-    // --- Nomes dos algoritmos ---
     std::vector<std::string> names = {
         "Bubble Sort", 
         "Insertion Sort", 
@@ -36,21 +32,21 @@ int main() {
     };
     size_t n = names.size();
 
-    // --- Computar viewports em grid de 2 colunas ---
+
     const int cols = 2;
-    int rows = (n + cols - 1) / cols;  // ceil(n / cols)
+    int rows = (n + cols - 1) / cols;
 
     std::vector<sf::FloatRect> viewports;
     viewports.reserve(n);
     for (size_t i = 0; i < n; ++i) {
-        int r = i / cols;           // linha
-        int c = i % cols;           // coluna
+        int r = i / cols;           
+        int c = i % cols;           
         viewports.emplace_back(
             sf::FloatRect(
-                { float(c) / cols,   // x offset
-                  float(r) / rows }, // y offset
-                { 1.f / cols,        // largura
-                  1.f / rows }       // altura
+                { float(c) / cols,  
+                  float(r) / rows }, 
+                { 1.f / cols,        
+                  1.f / rows }       
             )
         );
     }
@@ -73,7 +69,7 @@ int main() {
         vizs.back()->setData(baseData);
     }
 
-    // --- Instanciar algoritmos ---
+    // --- Instance algorithms ---
     std::vector<std::unique_ptr<SortAlgorithm>> algos;
     algos.emplace_back(std::make_unique<BubbleSort>(*vizs[0]));
     algos.emplace_back(std::make_unique<InsertionSort>(*vizs[1]));
@@ -86,7 +82,7 @@ int main() {
     bool anyRunning = true;
 
     while (window.isOpen()) {
-        // --- Eventos ---
+        // --- Events ---
         while (auto evOpt = window.pollEvent()) {
             const auto& event = *evOpt;
             if (event.is<sf::Event::Closed>()) {
@@ -106,7 +102,6 @@ int main() {
             }
         }
 
-        // --- Reset logic ---
         if (needsReset) {
             std::iota(baseData.begin(), baseData.end(), 1);
             std::shuffle(baseData.begin(), baseData.end(),
@@ -135,7 +130,6 @@ int main() {
         
         window.clear(sf::Color::Black);
 
-        // --- Update & Draw ---
         if (!isPaused && anyRunning) {
             bool stillRunning = false;
             for (size_t i = 0; i < n; ++i) {
